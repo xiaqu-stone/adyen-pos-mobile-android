@@ -42,11 +42,15 @@ class PaymentSampleAppFragment : Fragment() {
         val resultText = result.fold(
             onSuccess = { paymentResult ->
                 val decodedResult = String(Base64.getDecoder().decode(paymentResult.data))
-                logcat(tag = logTag) { "Caller Payment Result: \n $decodedResult" }
+                val errorMsg = "Caller Payment Result: \n $decodedResult"
+                logcat(tag = logTag) { errorMsg }
+                binding.tvMessage.text = errorMsg
                 if (paymentResult.success) "Payment Successful" else "Payment Failed"
             },
             onFailure = { error ->
-                logcat(tag = logTag) { "Result failed with: ${error.message}" }
+                val errorMsg = "Result failed with: ${error.message}"
+                logcat(tag = logTag) { errorMsg }
+                binding.tvMessage.text = errorMsg
                 "Payment Failed"
             },
         )
@@ -104,7 +108,7 @@ class PaymentSampleAppFragment : Fragment() {
         binding.buttonClearSession.setOnClickListener {
             uiScope.launch {
                 InPersonPayments.clearSession()
-                logcat(logTag){"perform clear session"}
+                logcat(logTag) { "perform clear session" }
             }
         }
 
@@ -116,7 +120,7 @@ class PaymentSampleAppFragment : Fragment() {
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun startDiagnosisDevice(){
+    private suspend fun startDiagnosisDevice() {
         val nexoRequest: String = generateDiagnosisNexoRequest(
             poiId = InPersonPayments.getInstallationId().getOrNull() ?: "UNKNOWN",
         )
@@ -126,10 +130,10 @@ class PaymentSampleAppFragment : Fragment() {
 
         val result = InPersonPayments.performDiagnosis(diagnosisRequest)
 
-        logcat(logTag){ "Diagnosis result:\n${result.getOrNull()}" }
-        if (result.isSuccess){
+        logcat(logTag) { "Diagnosis result:\n${result.getOrNull()}" }
+        if (result.isSuccess) {
             val attestationResult = String(Base64.getDecoder().decode(result.getOrThrow().data))
-            logcat(logTag){ "attestationResult: \n$attestationResult" }
+            logcat(logTag) { "attestationResult: \n$attestationResult" }
             val diagnosisResp = JSONObject(attestationResult).getJSONObject("SaleToPOIResponse")
                 .getJSONObject("DiagnosisResponse").getJSONObject("Response")
             val errorCondition = diagnosisResp.getString("ErrorCondition")
@@ -138,9 +142,11 @@ class PaymentSampleAppFragment : Fragment() {
 
             val uri = "https://dummy?$addResp".toUri()
             val attestationStatusBase64 = uri.getQueryParameter("attestationStatus")
-            val attestationStatus = String(Base64.getDecoder().decode(attestationStatusBase64),Charsets.UTF_8)
-            logcat(logTag){ "attestationStatus: \n$attestationStatus" }
-            Toast.makeText(requireContext(), "attestationStatus:$attestationStatus", Toast.LENGTH_LONG).show()
+            val attestationStatus =
+                String(Base64.getDecoder().decode(attestationStatusBase64), Charsets.UTF_8)
+            logcat(logTag) { "attestationStatus: \n$attestationStatus" }
+            binding.tvMessage.text = "attestationStatus: \n$attestationStatus\nerrorCondition:$errorCondition\nresult:$result"
+
         }
     }
 
