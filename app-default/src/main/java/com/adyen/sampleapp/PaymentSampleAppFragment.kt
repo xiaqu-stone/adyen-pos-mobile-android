@@ -3,12 +3,14 @@ package com.adyen.sampleapp
 import android.icu.text.SimpleDateFormat
 import android.icu.util.TimeZone
 import android.os.Bundle
+import java.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.adyen.ipp.api.InPersonPayments
+import com.adyen.ipp.api.diagnosis.DiagnosisRequest
 import com.adyen.ipp.api.payment.PaymentInterface
 import com.adyen.ipp.api.payment.PaymentInterfaceType
 import com.adyen.ipp.api.payment.TransactionRequest
@@ -19,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import logcat.logcat
-import java.util.Base64
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -96,6 +97,36 @@ class PaymentSampleAppFragment : Fragment() {
                     )
             }
         }
+
+        binding.buttonClearSession.setOnClickListener {
+            uiScope.launch {
+                InPersonPayments.clearSession()
+            }
+        }
+
+        binding.buttonDiagnosis.setOnClickListener {
+            uiScope.launch {
+                startDiagnosisDevice()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun startDiagnosisDevice(){
+        val nexoRequest: String = generateDiagnosisNexoRequest(
+            poiId = InPersonPayments.getInstallationId().getOrNull() ?: "UNKNOWN",
+        )
+        logcat(logTag) { "NexoRequest:\n$nexoRequest" }
+
+        val diagnosisRequest = DiagnosisRequest.create(nexoRequest).getOrThrow()
+
+        val result = InPersonPayments.performDiagnosis(diagnosisRequest)
+
+        logcat(logTag){ "Diagnosis result:\n${result.getOrNull()}" }
+        if (result.isSuccess){
+            val attestationResult = String(Base64.getDecoder().decode(result.getOrThrow().data))
+            logcat(logTag){ "attestationResult: \n$attestationResult" }
+        }
     }
 
 
@@ -123,6 +154,35 @@ class PaymentSampleAppFragment : Fragment() {
             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
             }
+
+        private fun generateDiagnosisNexoRequest(
+            serviceId: String = UUID.randomUUID().toString(),
+            saleId: String = "AndroidSampleApp",
+            poiId: String,
+        ): String {
+
+            val timeStamp = DATE_FORMAT.format(Date())
+            val maxServiceIdSize = 10
+
+            return """
+                |{
+                |  "SaleToPOIRequest": {
+                |    "MessageHeader": {
+                |      "ProtocolVersion": "3.0",
+                |      "MessageClass": "Service",
+                |      "MessageCategory": "Diagnosis",
+                |      "MessageType": "Request",
+                |      "ServiceID": "${serviceId.take(maxServiceIdSize)}",
+                |      "SaleID": "$saleId",
+                |      "POIID": "$poiId"
+                |    },
+                |    "DiagnosisRequest": {
+                |      "HostDiagnosisFlag": true
+                |    }
+                |  }
+                |}
+            """.trimMargin("|")
+        }
 
         private fun generateNexoRequest(
             serviceId: String = UUID.randomUUID().toString(),
