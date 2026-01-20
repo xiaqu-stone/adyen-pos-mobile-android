@@ -2,6 +2,7 @@ package com.adyen.sampleapp
 
 import android.icu.text.SimpleDateFormat
 import android.icu.util.TimeZone
+import android.net.Uri
 import android.os.Bundle
 import java.util.Base64
 import android.view.LayoutInflater
@@ -25,6 +26,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import kotlinx.serialization.ExperimentalSerializationApi
+import org.json.JSONObject
+import androidx.core.net.toUri
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -39,7 +42,7 @@ class PaymentSampleAppFragment : Fragment() {
         val resultText = result.fold(
             onSuccess = { paymentResult ->
                 val decodedResult = String(Base64.getDecoder().decode(paymentResult.data))
-                logcat(tag = logTag) { "Result: \n $decodedResult" }
+                logcat(tag = logTag) { "Caller Payment Result: \n $decodedResult" }
                 if (paymentResult.success) "Payment Successful" else "Payment Failed"
             },
             onFailure = { error ->
@@ -101,6 +104,7 @@ class PaymentSampleAppFragment : Fragment() {
         binding.buttonClearSession.setOnClickListener {
             uiScope.launch {
                 InPersonPayments.clearSession()
+                logcat(logTag){"perform clear session"}
             }
         }
 
@@ -126,6 +130,17 @@ class PaymentSampleAppFragment : Fragment() {
         if (result.isSuccess){
             val attestationResult = String(Base64.getDecoder().decode(result.getOrThrow().data))
             logcat(logTag){ "attestationResult: \n$attestationResult" }
+            val diagnosisResp = JSONObject(attestationResult).getJSONObject("SaleToPOIResponse")
+                .getJSONObject("DiagnosisResponse").getJSONObject("Response")
+            val errorCondition = diagnosisResp.getString("ErrorCondition")
+            val result = diagnosisResp.getString("Result")
+            val addResp = diagnosisResp.getString("AdditionalResponse")
+
+            val uri = "https://dummy?$addResp".toUri()
+            val attestationStatusBase64 = uri.getQueryParameter("attestationStatus")
+            val attestationStatus = String(Base64.getDecoder().decode(attestationStatusBase64),Charsets.UTF_8)
+            logcat(logTag){ "attestationStatus: \n$attestationStatus" }
+            Toast.makeText(requireContext(), "attestationStatus:$attestationStatus", Toast.LENGTH_LONG).show()
         }
     }
 
