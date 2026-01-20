@@ -48,9 +48,12 @@ class MyAuthenticationService : MerchantAuthenticationService() {
     // You can also declare this implementation somewhere else and pass it using your Dependency Injection system.
     override val authenticationProvider: AuthenticationProvider
         get() = object : AuthenticationProvider {
+            // Adyen SDK 内部 在需要认证时（例如初始化Session或者Session过期时）自动生成 setupToken，并调用此方法
+            // 需要把这个 setupToken 发送到 Adyen 后端 API 或者自己的服务器，然后获取到 sdkData，然后返回给 SDK
             override suspend fun authenticate(setupToken: String): Result<AuthenticationResponse> {
                 val client = createOkHttpClient()
 
+                // 1. 构建请求体，包含setupToken
                 val jsonObject = JSONObject().apply {
                     put("merchantAccount", merchantAccount)
                     put("setupToken", setupToken)
@@ -58,12 +61,14 @@ class MyAuthenticationService : MerchantAuthenticationService() {
                 val mediaType = "application/json".toMediaType()
                 val requestBody = jsonObject.toString().toRequestBody(mediaType)
 
+                // 2. 发送POST请求，将请求体发送给 Adyen 后端 API 或者自己的服务器
                 val request = Request.Builder()
                     .url(apiUrl)
                     .addHeader("x-api-key", apiKey)
                     .post(requestBody)
                     .build()
 
+                // 3. 处理响应，如果响应成功，则返回 AuthenticationResponse，否则返回错误
                 return suspendCancellableCoroutine { continuation ->
                     client.newCall(request).enqueue(object : Callback {
                         override fun onFailure(call: Call, e: IOException) {
@@ -73,6 +78,7 @@ class MyAuthenticationService : MerchantAuthenticationService() {
                         override fun onResponse(call: Call, response: Response) {
                             if (response.isSuccessful && response.body != null) {
                                 val json = JSONObject(response.body!!.string())
+                                // 将响应体中的 sdkData 转换为 AuthenticationResponse 并返回
                                 continuation.resume(
                                     Result.success(
                                         AuthenticationResponse.create(
@@ -81,6 +87,7 @@ class MyAuthenticationService : MerchantAuthenticationService() {
                                     )
                                 )
                             } else {
+                                // 如果响应不成功，则返回错误
                                 continuation.resume(Result.failure(Throwable("error")))
                             }
                         }
@@ -88,6 +95,7 @@ class MyAuthenticationService : MerchantAuthenticationService() {
                 }
             }
 
+            // 创建OkHttpClient，用于发送请求
             private fun createOkHttpClient(): OkHttpClient {
                 val logging = HttpLoggingInterceptor().apply {
                     setLevel(Level.BODY)
