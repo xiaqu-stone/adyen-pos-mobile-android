@@ -1,5 +1,6 @@
 package com.adyen.sampleapp
 
+import android.util.Log
 import com.adyen.ipp.api.authentication.AuthenticationProvider
 import com.adyen.ipp.api.authentication.AuthenticationResponse
 import com.adyen.ipp.api.authentication.MerchantAuthenticationService
@@ -18,6 +19,10 @@ import okhttp3.logging.HttpLoggingInterceptor.Level
 import org.json.JSONObject
 
 class MyAuthenticationService : MerchantAuthenticationService() {
+
+    companion object {
+        private const val TAG = "MyAuthenticationService"
+    }
 
     /**
      *  ------------
@@ -51,6 +56,7 @@ class MyAuthenticationService : MerchantAuthenticationService() {
             // Adyen SDK 内部 在需要认证时（例如初始化Session或者Session过期时）自动生成 setupToken，并调用此方法
             // 需要把这个 setupToken 发送到 Adyen 后端 API 或者自己的服务器，然后获取到 sdkData，然后返回给 SDK
             override suspend fun authenticate(setupToken: String): Result<AuthenticationResponse> {
+                Log.d(TAG, "authenticate() called with setupToken: $setupToken")
                 val client = createOkHttpClient()
 
                 // 1. 构建请求体，包含setupToken
@@ -72,23 +78,25 @@ class MyAuthenticationService : MerchantAuthenticationService() {
                 return suspendCancellableCoroutine { continuation ->
                     client.newCall(request).enqueue(object : Callback {
                         override fun onFailure(call: Call, e: IOException) {
+                            Log.e(TAG, "authenticate() onFailure: ${e.message}", e)
                             continuation.resume(Result.failure(Throwable(e)))
                         }
 
                         override fun onResponse(call: Call, response: Response) {
                             if (response.isSuccessful && response.body != null) {
                                 val json = JSONObject(response.body!!.string())
+                                val sdkData = json.optString("sdkData")
+                                Log.d(TAG, "authenticate() success, sdkData: $sdkData")
                                 // 将响应体中的 sdkData 转换为 AuthenticationResponse 并返回
                                 continuation.resume(
                                     Result.success(
-                                        AuthenticationResponse.create(
-                                            json.optString("sdkData")
-                                        )
+                                        AuthenticationResponse.create(sdkData)
                                     )
                                 )
                             } else {
                                 // 如果响应不成功，则返回错误
-                                continuation.resume(Result.failure(Throwable("error")))
+                                Log.e(TAG, "authenticate() failed, response code: ${response.code}, body: ${response.body?.string()}")
+                                continuation.resume(Result.failure(Throwable("error: ${response.code}")))
                             }
                         }
                     })
