@@ -95,6 +95,8 @@ class PaymentSampleAppFragment : Fragment() {
                 "Payment Failed"
             },
         )
+        // 支付成功 → Toast 显示 "Payment Successful"
+        // 支付失败 → Toast 显示 "Payment Failed"
         Toast.makeText(requireContext(), resultText, Toast.LENGTH_LONG).show()
     }
 
