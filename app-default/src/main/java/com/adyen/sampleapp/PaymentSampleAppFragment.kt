@@ -2,6 +2,7 @@ package com.adyen.sampleapp
 
 import android.icu.text.SimpleDateFormat
 import android.icu.util.TimeZone
+import android.net.Uri
 import android.os.Bundle
 import java.util.Base64
 import android.view.LayoutInflater
@@ -25,6 +26,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import kotlinx.serialization.ExperimentalSerializationApi
+import org.json.JSONObject
+import androidx.core.net.toUri
 
 /**
  * 支付示例应用 Fragment - Adyen In-Person Payments SDK 演示
@@ -80,11 +83,15 @@ class PaymentSampleAppFragment : Fragment() {
             onSuccess = { paymentResult ->
                 // paymentResult.data 是 Base64 编码的 NEXO 响应 JSON
                 val decodedResult = String(Base64.getDecoder().decode(paymentResult.data))
-                logcat(tag = logTag) { "Result: \n $decodedResult" }
+                val errorMsg = "Caller Payment Result: \n $decodedResult"
+                logcat(tag = logTag) { errorMsg }
+                binding.tvMessage.text = errorMsg
                 if (paymentResult.success) "Payment Successful" else "Payment Failed"
             },
             onFailure = { error ->
-                logcat(tag = logTag) { "Result failed with: ${error.message}" }
+                val errorMsg = "Result failed with: ${error.message}"
+                logcat(tag = logTag) { errorMsg }
+                binding.tvMessage.text = errorMsg
                 "Payment Failed"
             },
         )
@@ -181,6 +188,7 @@ class PaymentSampleAppFragment : Fragment() {
         binding.buttonClearSession.setOnClickListener {
             uiScope.launch {
                 InPersonPayments.clearSession()
+                logcat(logTag) { "perform clear session" }
             }
         }
 
@@ -233,7 +241,20 @@ class PaymentSampleAppFragment : Fragment() {
         if (result.isSuccess){
             // 诊断结果是 Base64 编码的 NEXO 响应，需要解码
             val attestationResult = String(Base64.getDecoder().decode(result.getOrThrow().data))
-            logcat(logTag){ "attestationResult: \n$attestationResult" }
+            logcat(logTag) { "attestationResult: \n$attestationResult" }
+            val diagnosisResp = JSONObject(attestationResult).getJSONObject("SaleToPOIResponse")
+                .getJSONObject("DiagnosisResponse").getJSONObject("Response")
+            val errorCondition = diagnosisResp.getString("ErrorCondition")
+            val result = diagnosisResp.getString("Result")
+            val addResp = diagnosisResp.getString("AdditionalResponse")
+
+            val uri = "https://dummy?$addResp".toUri()
+            val attestationStatusBase64 = uri.getQueryParameter("attestationStatus")
+            val attestationStatus =
+                String(Base64.getDecoder().decode(attestationStatusBase64), Charsets.UTF_8)
+            logcat(logTag) { "attestationStatus: \n$attestationStatus" }
+            binding.tvMessage.text = "attestationStatus: \n$attestationStatus\nerrorCondition:$errorCondition\nresult:$result"
+
         }
     }
 
