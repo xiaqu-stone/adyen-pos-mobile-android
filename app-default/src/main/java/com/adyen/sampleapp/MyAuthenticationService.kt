@@ -90,7 +90,7 @@ class MyAuthenticationService : MerchantAuthenticationService() {
              * 执行认证请求
              *
              * 【作用】
-             * 将 SDK 生成的 setupToken 发送到 Adyen 后端，获取会话凭证 sdkData。
+             * 将 SDK 生成的 setupToken 发送到 Adyen 后端/自己的后端，获取会话凭证 sdkData。
              *
              * 【流程】
              * 1. 构建 JSON 请求体（包含 merchantAccount 和 setupToken）

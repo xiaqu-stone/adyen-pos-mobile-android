@@ -300,7 +300,7 @@ class PaymentSampleAppFragment : Fragment() {
             paymentInterface = paymentInterface,                             // 支付接口 (读卡器/T2P)
             transactionRequest = TransactionRequest.create(nexoRequest).getOrThrow(), // NEXO 请求
             paymentLauncher = resultLauncher,                               // 结果回调
-            merchantUiParameters = MerchantUiParameters.create()            // UI 参数（可自定义）
+            merchantUiParameters = MerchantUiParameters.create()            // UI 参数，默认配置，无自定义（可自定义）
         )
         // 注意: 此方法返回后，支付流程已经启动
         // 支付结果将通过 resultLauncher 异步回调
